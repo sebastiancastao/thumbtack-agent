@@ -10,6 +10,8 @@
     "verify:thumbtack-login": "node scripts/verify-thumbtack-login.mjs",
     "login:thumbtack": "node scripts/login-save-session.mjs",
     "agent:thumbtack": "node scripts/thumbtack-agent.mjs",
+    "agent:thumbtack:headless": "node scripts/thumbtack-agent-headless.mjs",
+    "export:thumbtack-session": "node scripts/export-session.mjs",
     "import:thumbtack-cookies": "node scripts/import-cookies.mjs"
   },
   "dependencies": {

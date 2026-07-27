@@ -1,0 +1,44 @@
+name: Thumbtack agent
+
+# Runs the message-check-and-reply agent headlessly on a schedule, since it
+# can't run inside Vercel/Supabase Edge Functions (no persistent process, no
+# room for a real Chromium binary). See scripts/thumbtack-agent-headless.mjs.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: thumbtack-agent
+  cancel-in-progress: false
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run agent
+        env:
+          THUMBTACK_STORAGE_STATE: ${{ secrets.THUMBTACK_STORAGE_STATE }}
+        run: node scripts/thumbtack-agent-headless.mjs
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unanswered-messages
+          path: logs/unanswered-messages.json
+          if-no-files-found: ignore
+          retention-days: 14
