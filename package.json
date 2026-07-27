@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:thumbtack-login": "node scripts/verify-thumbtack-login.mjs",
+    "login:thumbtack": "node scripts/login-save-session.mjs",
+    "agent:thumbtack": "node scripts/thumbtack-agent.mjs",
+    "import:thumbtack-cookies": "node scripts/import-cookies.mjs"
   },
   "dependencies": {
     "next": "16.2.11",
@@ -18,8 +22,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
+    "playwright": "^1.61.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
