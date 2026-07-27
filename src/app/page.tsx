@@ -25,6 +25,22 @@ export default function Home() {
     setMessage(null);
     try {
       const res = await fetch(`/api/thumbtack/${kind}`, { method: "POST" });
+
+      if (res.status === 403 && kind === "login") {
+        // This isn't running locally, so the server can't pop a Playwright
+        // window on anyone's screen (and couldn't persist a session for the
+        // agent step even if it could). Fall back to just opening Thumbtack's
+        // real login page in a normal browser tab so you can at least sign
+        // in and look around — the automated "Run agent" step still needs
+        // the project running locally (`npm run dev` + `npm run
+        // login:thumbtack`) since that's what saves a reusable session.
+        window.open("https://www.thumbtack.com/login", "_blank", "noopener,noreferrer");
+        setMessage(
+          "This is a deployed instance, so it can't launch a browser on your machine or save a session here. Opened thumbtack.com/login in a new tab instead — to run the automated agent, clone and run this project locally with `npm run dev`."
+        );
+        return;
+      }
+
       const data = await res.json();
       setMessage(data.message ?? data.error ?? "Done.");
     } catch {
