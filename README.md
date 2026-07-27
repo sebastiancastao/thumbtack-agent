@@ -55,7 +55,7 @@ The message-check-and-reply loop can't run inside Vercel or Supabase Edge Functi
 
 3. **Save it as a GitHub secret**: repo Settings → Secrets and variables → Actions → New repository secret, named `THUMBTACK_STORAGE_STATE`, value = the entire contents of that file. Then delete the local file — it contains live session cookies.
 
-4. That's it — [.github/workflows/thumbtack-agent.yml](.github/workflows/thumbtack-agent.yml) runs `scripts/thumbtack-agent-headless.mjs` every 15 minutes on GitHub's runners, headless, using that saved session. You can also trigger it manually from the Actions tab (`workflow_dispatch`).
+4. That's it — [.github/workflows/thumbtack-agent.yml](.github/workflows/thumbtack-agent.yml) runs `scripts/thumbtack-agent-headless.mjs` every 5 minutes between 8pm and 8am America/New_York (Georgia) time, headless, on GitHub's runners, using that saved session. The window is DST-aware (checked against the actual timezone, not a fixed UTC offset), so it won't drift when clocks change. You can also trigger it manually any time from the Actions tab (`workflow_dispatch`).
 
 5. If a run fails with "SESSION EXPIRED" (GitHub will show the workflow as failed), repeat steps 1–3 to refresh the secret.
 

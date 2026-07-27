@@ -1,11 +1,23 @@
 name: Thumbtack agent
 
-# Runs the message-check-and-reply agent headlessly on a schedule, since it
-# can't run inside Vercel/Supabase Edge Functions (no persistent process, no
-# room for a real Chromium binary). See scripts/thumbtack-agent-headless.mjs.
+# Runs the message-check-and-reply agent headlessly, every 5 minutes, but
+# only during 8pm-8am America/New_York (Georgia) time -- i.e. outside the
+# hours the human team already covers (see REPLY_MESSAGE in
+# scripts/lib/thumbtack-inbox.mjs). It can't run inside Vercel/Supabase Edge
+# Functions (no persistent process, no room for a real Chromium binary), so
+# it runs here on a schedule instead. See scripts/thumbtack-agent-headless.mjs.
+#
+# GitHub Actions cron only understands UTC, and US Eastern time shifts
+# between UTC-4 (EDT) and UTC-5 (EST) with daylight saving, so a fixed UTC
+# cron window would drift by an hour twice a year. Instead: the cron trigger
+# below fires every 5 minutes across a generous UTC superset of the target
+# window (00:00-13:59 UTC, which covers 8pm-8am Eastern in both EST and
+# EDT), and the "Check active window" step does the precise, DST-aware
+# check using the actual America/New_York timezone before anything else
+# runs.
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 0-13 * * *"
   workflow_dispatch: {}
 
 concurrency:
@@ -17,25 +29,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Check active window (8pm-8am America/New_York)
+        id: window
+        run: |
+          hour=$(TZ='America/New_York' date +%H)
+          hour=$((10#$hour))
+          if [ "$hour" -ge 20 ] || [ "$hour" -lt 8 ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Current America/New_York hour: $hour"
+
       - uses: actions/checkout@v4
+        if: steps.window.outputs.active == 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.window.outputs.active == 'true'
         with:
           node-version: 20
 
       - name: Install dependencies
+        if: steps.window.outputs.active == 'true'
         run: npm ci
 
       - name: Install Playwright Chromium
+        if: steps.window.outputs.active == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Run agent
+        if: steps.window.outputs.active == 'true'
         env:
           THUMBTACK_STORAGE_STATE: ${{ secrets.THUMBTACK_STORAGE_STATE }}
         run: node scripts/thumbtack-agent-headless.mjs
 
       - name: Upload results
-        if: always()
+        if: steps.window.outputs.active == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: unanswered-messages
