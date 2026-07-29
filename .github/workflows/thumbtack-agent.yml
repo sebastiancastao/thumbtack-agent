@@ -18,7 +18,16 @@ name: Thumbtack agent
 on:
   schedule:
     - cron: "*/5 0-13 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run now even outside the 8pm-8am window (for testing)"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Report unanswered messages but don't actually reply (for testing)"
+        type: boolean
+        default: true
 
 concurrency:
   group: thumbtack-agent
@@ -28,26 +37,46 @@ jobs:
   run-agent:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # THUMBTACK_STORAGE_STATE lives in this environment's secrets, not the
+    # repo's — on a public repo, an environment secret is only readable by a
+    # job that explicitly opts in here, instead of every workflow in the repo.
+    # Do NOT add required-reviewer/wait-timer protection rules to this
+    # environment: this job must run unattended on every schedule tick.
+    environment: thumbtack-agent
     steps:
       - name: Check active window (8pm-8am America/New_York)
         id: window
+        env:
+          FORCE_RUN: ${{ github.event.inputs.force }}
         run: |
           hour=$(TZ='America/New_York' date +%H)
           hour=$((10#$hour))
-          if [ "$hour" -ge 20 ] || [ "$hour" -lt 8 ]; then
+          if [ "$hour" -ge 20 ] || [ "$hour" -lt 8 ] || [ "$FORCE_RUN" = "true" ]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "Current America/New_York hour: $hour"
+          echo "Current America/New_York hour: $hour (force=$FORCE_RUN)"
 
-      - uses: actions/checkout@v4
+      - name: Check Thumbtack session secret
+        if: steps.window.outputs.active == 'true'
+        env:
+          THUMBTACK_STORAGE_STATE: ${{ secrets.THUMBTACK_STORAGE_STATE }}
+        run: |
+          if [ -z "$THUMBTACK_STORAGE_STATE" ]; then
+            echo "Missing THUMBTACK_STORAGE_STATE secret."
+            echo "Create/update it under Settings -> Environments -> thumbtack-agent -> Environment secrets."
+            exit 1
+          fi
+          echo "THUMBTACK_STORAGE_STATE secret is configured."
+
+      - uses: actions/checkout@v5
         if: steps.window.outputs.active == 'true'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.window.outputs.active == 'true'
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install dependencies
         if: steps.window.outputs.active == 'true'
@@ -61,11 +90,14 @@ jobs:
         if: steps.window.outputs.active == 'true'
         env:
           THUMBTACK_STORAGE_STATE: ${{ secrets.THUMBTACK_STORAGE_STATE }}
+          # Empty on scheduled runs (no inputs), which correctly resolves to
+          # "not a dry run" -- only workflow_dispatch sets this explicitly.
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: node scripts/thumbtack-agent-headless.mjs
 
       - name: Upload results
         if: steps.window.outputs.active == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: unanswered-messages
           path: logs/unanswered-messages.json

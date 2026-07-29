@@ -18,6 +18,11 @@ fs.mkdirSync(screenshotDir, { recursive: true });
 const logDir = path.resolve('logs');
 fs.mkdirSync(logDir, { recursive: true });
 
+const dryRun = process.env.DRY_RUN === 'true';
+if (dryRun) {
+  console.log('DRY RUN — will report unanswered messages but will NOT actually reply to anyone.\n');
+}
+
 async function main() {
   if (!tryAcquireLock()) {
     console.log('A Thumbtack browser window is already open — bringing it to the front instead of opening a new one.');
@@ -60,11 +65,13 @@ async function main() {
         for (const [i, m] of unanswered.entries()) {
           console.log(`\n[${i + 1}/${unanswered.length}] Opening thread with ${m.customer}...`);
           const threadPage = await context.newPage();
-          const { threadText, sent } = await visitThread(threadPage, m.url);
+          const { threadText, sent } = await visitThread(threadPage, m.url, { dryRun });
           m.threadText = threadText;
           m.replySent = sent;
           console.log(threadText);
-          console.log(sent ? '  Reply sent.' : '  Reply NOT sent (see warning above).');
+          if (!dryRun) {
+            console.log(sent ? '  Reply sent.' : '  Reply NOT sent (see warning above).');
+          }
         }
       }
 

@@ -60,7 +60,10 @@ export async function findUnansweredMessages(page) {
   return results;
 }
 
-export async function visitThread(page, url) {
+// dryRun: check everything (thread text, whether a composer is present and
+// enabled) without ever typing into it or clicking Send — for testing
+// against real, live leads without actually messaging them.
+export async function visitThread(page, url, { dryRun = false } = {}) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
 
@@ -82,6 +85,15 @@ export async function visitThread(page, url) {
   try {
     const box = page.getByPlaceholder('Type message');
     await box.waitFor({ state: 'visible', timeout: 8000 });
+
+    if (dryRun) {
+      const composerVisible = await box.isVisible().catch(() => false);
+      console.log(composerVisible
+        ? '  [DRY RUN] Composer found — a real run would reply here.'
+        : '  [DRY RUN] No composer found — a real run would NOT be able to reply here.');
+      return { threadText, sent: false };
+    }
+
     await box.click();
     await box.type(REPLY_MESSAGE, { delay: 15 });
     const typedValue = await box.inputValue().catch(() => '');

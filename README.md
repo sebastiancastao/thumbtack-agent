@@ -53,7 +53,11 @@ The message-check-and-reply loop can't run inside Vercel or Supabase Edge Functi
    ```
    This writes `auth/session-state.json` (cookies + localStorage, no password).
 
-3. **Save it as a GitHub secret**: repo Settings → Secrets and variables → Actions → New repository secret, named `THUMBTACK_STORAGE_STATE`, value = the entire contents of that file. Then delete the local file — it contains live session cookies.
+3. **Save it as an environment secret** (not a repository secret — this repo is public, so scoping the secret to only the one job that needs it is worth the extra step):
+   - Repo Settings → **Environments** → **New environment** → name it `thumbtack-agent` (must match the `environment:` key in the workflow) → **Configure environment**.
+   - Do **not** add any deployment protection rules (required reviewers, wait timer) — this job runs unattended on a schedule, and a reviewer gate would block every single run.
+   - Under that environment's **Environment secrets**, add one named `THUMBTACK_STORAGE_STATE`, value = the entire contents of `auth/session-state.json`.
+   - Then delete the local file — it contains live session cookies.
 
 4. That's it — [.github/workflows/thumbtack-agent.yml](.github/workflows/thumbtack-agent.yml) runs `scripts/thumbtack-agent-headless.mjs` every 5 minutes between 8pm and 8am America/New_York (Georgia) time, headless, on GitHub's runners, using that saved session. The window is DST-aware (checked against the actual timezone, not a fixed UTC offset), so it won't drift when clocks change. You can also trigger it manually any time from the Actions tab (`workflow_dispatch`).
 
